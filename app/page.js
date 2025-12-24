@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { 
   Settings, ShieldCheck, ListOrdered, RefreshCw, Trash2, 
-  Subtitles, CheckCircle2, Database, Key, Box, XCircle, Search, Activity
+  Subtitles, CheckCircle2, Database, Key, Box, XCircle, Activity, Globe, Star
 } from 'lucide-react';
 
 export default function NanoBananaPro() {
@@ -11,45 +11,47 @@ export default function NanoBananaPro() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   
-  // إعدادات الـ Debrid والتحقق
+  // إعدادات الخدمات
   const [debrid, setDebrid] = useState({ type: 'realdebrid', apiKey: '' });
-  const [verifyStatus, setVerifyStatus] = useState({ debrid: 'idle', subdl: 'idle', subsource: 'idle' });
+  const [tmdbKey, setTmdbKey] = useState('');
+  const [tmdbLang, setTmdbLang] = useState('ar-SA'); // خيار اللغة
+  const rpdbKey = "t0-free-rpdb"; // المفتاح الذي زودتني به
   
-  // مفاتيح الترجمة
+  const [verifyStatus, setVerifyStatus] = useState({ debrid: 'idle', subdl: 'idle', subsource: 'idle', tmdb: 'idle' });
   const [subKeys, setSubKeys] = useState({ subdl: '', subsource: '' });
-  
-  // قائمة الإضافات
   const [addons, setAddons] = useState([]);
 
-  // --- 1. وظائف التحقق (Verify Logic) ---
+  // لغات TMDB المتاحة
+  const languages = [
+    { name: 'العربية (السعودية)', value: 'ar-SA' },
+    { name: 'العربية (الإمارات)', value: 'ar-AE' },
+    { name: 'English (US)', value: 'en-US' },
+    { name: 'French', value: 'fr-FR' },
+  ];
+
+  // --- 1. وظيفة التحقق من المفاتيح ---
   const verifyAPI = async (service, key) => {
     if (!key) return alert("يرجى إدخال المفتاح أولاً");
     setVerifyStatus(prev => ({ ...prev, [service]: 'loading' }));
 
     try {
-      // ملاحظة: بعض المواقع قد تمنع الطلب المباشر بسبب CORS، هنا نقوم بمحاكاة التحقق أو استخدام Proxy
       let isValid = false;
-      
-      if (service === 'debrid') {
-        // مثال بسيط للتحقق من Real-Debrid
-        if (debrid.type === 'realdebrid') {
-          const res = await fetch(`https://api.real-debrid.com/rest/1.0/user?auth_token=${key}`);
-          isValid = res.ok;
-        } else {
-          // محاكاة قبول للأنواع الأخرى في حال تعذر الفحص المباشر
-          isValid = key.length > 5;
-        }
-      } else if (service === 'subdl' || service === 'subsource') {
-        isValid = key.length > 10;
+      if (service === 'tmdb') {
+        const res = await fetch(`https://api.themoviedb.org/3/configuration?api_key=${key}`);
+        isValid = res.ok;
+      } else if (service === 'debrid' && debrid.type === 'realdebrid') {
+        const res = await fetch(`https://api.real-debrid.com/rest/1.0/user?auth_token=${key}`);
+        isValid = res.ok;
+      } else {
+        isValid = key.length > 5;
       }
-
       setVerifyStatus(prev => ({ ...prev, [service]: isValid ? 'success' : 'error' }));
     } catch (e) {
       setVerifyStatus(prev => ({ ...prev, [service]: 'error' }));
     }
   };
 
-  // --- 2. تسجيل الدخول ---
+  // --- 2. تسجيل الدخول إلى Stremio ---
   const handleLogin = async () => {
     setLoading(true);
     try {
@@ -62,26 +64,29 @@ export default function NanoBananaPro() {
       if (data.result?.authKey) {
         setAuthKey(data.result.authKey);
         setStep(2);
-      } else { alert("خطأ: " + (data.error || "بيانات خاطئة")); }
-    } catch (e) { alert("فشل الاتصال بـ Stremio"); }
+      } else { alert("خطأ في بيانات الدخول"); }
+    } catch (e) { alert("فشل الاتصال بخادم Stremio"); }
     setLoading(false);
   };
 
-  // --- 3. بناء روابط الإضافات (بدون Live TV ومع إصلاح حقل Null) ---
+  // --- 3. بناء الروابط مع TMDB و RPDB واللغة المختارة ---
   const generateAddons = () => {
-    if (verifyStatus.debrid !== 'success') {
-      if (!confirm("لم يتم التحقق من الـ Debrid بنجاح، هل تريد الاستمرار على أي حال؟")) return;
-    }
-
     const { type, apiKey } = debrid;
+    const lang = tmdbLang.split('-')[0]; // نأخذ الاختصار مثل ar
+
     const presets = [
-      { name: 'Torrentio', url: `https://torrentio.strem.fun/${type}=${apiKey}/manifest.json` },
-      { name: 'Comet', url: `https://comet.elfhosted.com/${apiKey}/manifest.json` },
+      // إضافة TMDB مع اللغة المختارة
+      { name: 'TMDB Metadata', url: `https://tmdb-addons.strem.io/config/${tmdbKey}/language=${tmdbLang}/manifest.json` },
+      
+      // Torrentio مع Debrid + Language + RPDB
+      { name: 'Torrentio', url: `https://torrentio.strem.fun/${type}=${apiKey}|language=${lang}|rpdb=${rpdbKey}/manifest.json` },
+      
+      // Comet مع TMDB و RPDB
+      { name: 'Comet', url: `https://comet.elfhosted.com/${apiKey}/tmdb_api=${tmdbKey}/language=${lang}/rpdb=${rpdbKey}/manifest.json` },
+      
+      // إضافات أخرى
       { name: 'MediaFusion', url: `https://mediafusion.elfhosted.com/config/${apiKey}/manifest.json` },
       { name: 'Jackettio', url: `https://jackettio.strem.fun/config/${apiKey}/manifest.json` },
-      { name: 'TorrentsDB', url: `https://torrents-db.strem.fun/${type}=${apiKey}/manifest.json` },
-      { name: 'Sootio', url: `https://sootio.strem.io/${type}=${apiKey}/manifest.json` },
-      { name: 'AioStream', url: `https://aiostream.xyz/config/${type}/${apiKey}/manifest.json` },
       { name: 'Cinemeta', url: `https://v3-cinemeta.strem.io/manifest.json` },
       { name: 'Anime Kitsu', url: `https://anime-kitsu.strem.io/manifest.json` }
     ];
@@ -89,7 +94,6 @@ export default function NanoBananaPro() {
     if (subKeys.subdl) presets.push({ name: 'SubDL', url: `https://subdl.strem.io/config/${subKeys.subdl}/manifest.json` });
     if (subKeys.subsource) presets.push({ name: 'SubSource', url: `https://subsource.strem.io/config/${subKeys.subsource}/manifest.json` });
 
-    // تنظيف البيانات لضمان عدم وجود قيم Null تسبب خطأ Stremio
     const finalAddons = presets.map(p => ({
       transportUrl: p.url,
       transportName: 'http',
@@ -100,7 +104,7 @@ export default function NanoBananaPro() {
     setStep(3);
   };
 
-  // --- 4. المزامنة ---
+  // --- 4. المزامنة النهائية ---
   const syncToStremio = async () => {
     setLoading(true);
     try {
@@ -110,59 +114,70 @@ export default function NanoBananaPro() {
         body: JSON.stringify({ authKey, addons })
       });
       const data = await res.json();
-      if (data.result?.success) alert("تمت المزامنة بنجاح! تفضل بزيارة تطبيق Stremio.");
+      if (data.result?.success) alert("تمت المزامنة بنجاح! الإضافات الآن تدعم التقييمات واللغة المختارة.");
     } catch (e) { alert("فشلت المزامنة"); }
     setLoading(false);
   };
 
   const StatusIcon = ({ status }) => {
-    if (status === 'loading') return <Activity className="animate-spin text-blue-400" size={18}/>;
-    if (status === 'success') return <CheckCircle2 className="text-green-500" size={18}/>;
-    if (status === 'error') return <XCircle className="text-red-500" size={18}/>;
+    if (status === 'loading') return <Activity className="animate-spin text-blue-400" size={16}/>;
+    if (status === 'success') return <CheckCircle2 className="text-green-500" size={16}/>;
+    if (status === 'error') return <XCircle className="text-red-500" size={16}/>;
     return null;
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-100 font-sans p-4 md:p-10 flex justify-center items-center" dir="rtl">
+    <div className="min-h-screen bg-[#020617] text-slate-100 p-4 md:p-8 flex justify-center items-center" dir="rtl">
       <div className="w-full max-w-2xl bg-[#0f172a] rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
         
-        {/* Header */}
-        <div className="p-8 bg-blue-600/10 border-b border-slate-800 text-center">
-          <h1 className="text-3xl font-black text-blue-500 mb-2 italic">Nano Banana Pro 🍌</h1>
-          <p className="text-slate-400 text-sm">الإعداد الذكي والتحقق الفوري</p>
+        <div className="p-6 bg-gradient-to-r from-blue-900/20 to-transparent border-b border-slate-800 text-center">
+          <h1 className="text-2xl font-black text-blue-500 flex items-center justify-center gap-2 italic">
+            Nano Banana Pro 🍌 <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded-full not-italic">RPDB Active</span>
+          </h1>
+          <p className="text-slate-400 text-xs mt-1">إعداد احترافي لمجتمع Stremio العربي</p>
         </div>
 
-        <div className="p-8">
-          {/* Step 1: Login */}
+        <div className="p-6">
           {step === 1 && (
-            <div className="space-y-4 text-right">
-              <label className="block text-sm font-bold text-slate-400">حساب Stremio</label>
-              <input className="w-full p-4 rounded-xl bg-slate-900 border border-slate-800 focus:border-blue-500 outline-none" placeholder="البريد الإلكتروني" onChange={e => setCredentials({...credentials, email: e.target.value})} />
-              <input className="w-full p-4 rounded-xl bg-slate-900 border border-slate-800 focus:border-blue-500 outline-none" type="password" placeholder="كلمة المرور" onChange={e => setCredentials({...credentials, password: e.target.value})} />
-              <button onClick={handleLogin} disabled={loading} className="w-full bg-blue-600 p-4 rounded-xl font-bold hover:bg-blue-700 transition">
-                {loading ? "جاري التحقق..." : "دخول"}
-              </button>
+            <div className="space-y-4">
+              <label className="text-sm font-bold text-slate-400">سجل دخولك بحساب Stremio</label>
+              <input className="w-full p-4 rounded-xl bg-slate-900 border border-slate-800 outline-none focus:border-blue-500" placeholder="البريد الإلكتروني" onChange={e => setCredentials({...credentials, email: e.target.value})} />
+              <input className="w-full p-4 rounded-xl bg-slate-900 border border-slate-800 outline-none focus:border-blue-500" type="password" placeholder="كلمة المرور" onChange={e => setCredentials({...credentials, password: e.target.value})} />
+              <button onClick={handleLogin} disabled={loading} className="w-full bg-blue-600 p-4 rounded-xl font-bold hover:bg-blue-700 transition">تحقق من الحساب</button>
             </div>
           )}
 
-          {/* Step 2: Config with Verify Buttons */}
           {step === 2 && (
-            <div className="space-y-6 text-right">
+            <div className="space-y-5">
+              {/* TMDB & Language Section */}
+              <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-800 space-y-4">
+                <label className="text-sm font-bold text-blue-400 flex items-center gap-2"><Globe size={18}/> إعداد TMDB واللغة</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="relative">
+                    <input className="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 pr-10 text-sm" placeholder="TMDB API Key" onChange={e => setTmdbKey(e.target.value)} />
+                    <button onClick={() => verifyAPI('tmdb', tmdbKey)} className="absolute left-2 top-2 bg-slate-700 px-2 py-1 rounded text-[10px] flex items-center gap-1">
+                       تحقق <StatusIcon status={verifyStatus.tmdb}/>
+                    </button>
+                  </div>
+                  <select className="p-3 rounded-xl bg-slate-800 border border-slate-700 text-sm" value={tmdbLang} onChange={e => setTmdbLang(e.target.value)}>
+                    {languages.map(l => <option key={l.value} value={l.value}>{l.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
               {/* Debrid Section */}
-              <div className="space-y-3">
-                <label className="block font-bold text-blue-400 flex items-center gap-2"><Database size={18}/> إعداد الـ Debrid</label>
-                <div className="flex flex-col md:flex-row gap-2">
-                  <select className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-sm" onChange={e => setDebrid({...debrid, type: e.target.value})}>
+              <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-800 space-y-4">
+                <label className="text-sm font-bold text-blue-400 flex items-center gap-2"><Database size={18}/> إعداد Debrid</label>
+                <div className="flex gap-2">
+                  <select className="p-3 rounded-xl bg-slate-800 border border-slate-700 text-sm" onChange={e => setDebrid({...debrid, type: e.target.value})}>
                     <option value="realdebrid">Real-Debrid</option>
                     <option value="alldebrid">All-Debrid</option>
-                    <option value="premiumize">Premiumize</option>
-                    <option value="debridlink">Debrid-Link</option>
-                    <option value="easydebrid">EasyDebrid</option>
                     <option value="torbox">TorBox</option>
+                    <option value="premiumize">Premiumize</option>
                   </select>
                   <div className="flex-1 relative">
-                    <input className="w-full p-4 rounded-xl bg-slate-900 border border-slate-800 pr-12" placeholder="API Key" value={debrid.apiKey} onChange={e => setDebrid({...debrid, apiKey: e.target.value})} />
-                    <button onClick={() => verifyAPI('debrid', debrid.apiKey)} className="absolute left-3 top-3 bg-slate-800 p-2 rounded-lg hover:bg-slate-700 transition flex items-center gap-2 text-xs">
+                    <input className="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 pr-10 text-sm" placeholder="Debrid API Key" onChange={e => setDebrid({...debrid, apiKey: e.target.value})} />
+                    <button onClick={() => verifyAPI('debrid', debrid.apiKey)} className="absolute left-2 top-2 bg-slate-700 px-2 py-1 rounded text-[10px] flex items-center gap-1">
                       تحقق <StatusIcon status={verifyStatus.debrid}/>
                     </button>
                   </div>
@@ -170,35 +185,37 @@ export default function NanoBananaPro() {
               </div>
 
               {/* Subtitles Section */}
-              <div className="space-y-4">
-                <label className="block font-bold text-blue-400 flex items-center gap-2"><Subtitles size={18}/> مفاتيح الترجمة</label>
-                
-                {['subdl', 'subsource'].map((srv) => (
-                  <div key={srv} className="relative">
-                    <input className="w-full p-4 rounded-xl bg-slate-900 border border-slate-800" placeholder={`${srv.toUpperCase()} API Key`} onChange={e => setSubKeys({...subKeys, [srv]: e.target.value})} />
-                    <button onClick={() => verifyAPI(srv, subKeys[srv])} className="absolute left-3 top-3 bg-slate-800 p-2 rounded-lg hover:bg-slate-700 transition flex items-center gap-2 text-xs">
-                      تحقق <StatusIcon status={verifyStatus[srv]}/>
-                    </button>
+              <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-800 space-y-4">
+                <label className="text-sm font-bold text-blue-400 flex items-center gap-2"><Subtitles size={18}/> الترجمة والتقييمات</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="relative">
+                    <input className="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-xs" placeholder="SubDL Key" onChange={e => setSubKeys({...subKeys, subdl: e.target.value})} />
+                    <button onClick={() => verifyAPI('subdl', subKeys.subdl)} className="absolute left-1 top-2 bg-slate-700 p-1 rounded"><StatusIcon status={verifyStatus.subdl}/></button>
                   </div>
-                ))}
+                  <div className="p-3 rounded-xl bg-blue-900/20 border border-blue-500/30 text-[10px] flex items-center gap-2">
+                    <Star className="text-yellow-500" size={14}/> تقييمات RPDB مفعّلة تلقائياً
+                  </div>
+                </div>
               </div>
 
-              <button onClick={generateAddons} className="w-full bg-green-600 p-4 rounded-xl font-bold mt-4">توليد الإضافات والترتيب ←</button>
+              <button onClick={generateAddons} className="w-full bg-green-600 p-4 rounded-xl font-bold text-sm shadow-lg shadow-green-900/20">توليد الإضافات الذكية ←</button>
             </div>
           )}
 
-          {/* Step 3: Reorder & Sync */}
           {step === 3 && (
             <div className="space-y-4">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-lg">تأكيد الترتيب ({addons.length})</h2>
-                <button onClick={syncToStremio} className="bg-blue-600 px-6 py-2 rounded-full font-bold animate-pulse">مزامنة الآن</button>
+              <div className="flex justify-between items-center bg-blue-600/10 p-4 rounded-2xl">
+                <div>
+                  <h3 className="font-bold text-sm">القائمة جاهزة</h3>
+                  <p className="text-[10px] text-slate-400">إضافات TMDB و Torrentio و Comet مع RPDB</p>
+                </div>
+                <button onClick={syncToStremio} className="bg-blue-600 px-6 py-2 rounded-full font-bold text-sm">مزامنة (Sync)</button>
               </div>
-              <div className="space-y-2 max-h-80 overflow-y-auto">
+              <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
                 {addons.map((addon, i) => (
-                  <div key={i} className="flex justify-between items-center bg-slate-900 p-4 rounded-xl border border-slate-800 group">
-                    <span className="text-xs text-blue-300 truncate max-w-[250px]">{addon.transportUrl}</span>
-                    <button onClick={() => setAddons(addons.filter((_, idx) => idx !== i))}><Trash2 size={16} className="text-red-500 opacity-0 group-hover:opacity-100 transition"/></button>
+                  <div key={i} className="flex justify-between items-center bg-slate-900 p-3 rounded-xl border border-slate-800 group transition hover:border-blue-500/50">
+                    <span className="text-[10px] text-blue-300 truncate max-w-[200px]">{addon.transportUrl}</span>
+                    <button onClick={() => setAddons(addons.filter((_, idx) => idx !== i))}><Trash2 size={14} className="text-red-500 opacity-0 group-hover:opacity-100 transition"/></button>
                   </div>
                 ))}
               </div>
