@@ -8,15 +8,12 @@ export default function NanoBananaPro() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   
-  // المفاتيح المطلوبة
   const [rdKey, setRdKey] = useState('');
   const [torboxKey, setTorboxKey] = useState('');
   const [subdlKey, setSubdlKey] = useState('');
-  const [tmdbKey, setTmdbKey] = useState(''); // مفتاح TMDB الجديد
   
   const [addons, setAddons] = useState([]);
 
-  // 1. تسجيل الدخول
   const handleLogin = async () => {
     setLoading(true);
     try {
@@ -32,38 +29,19 @@ export default function NanoBananaPro() {
     setLoading(false);
   };
 
-  // 2. توليد الروابط المعقدة برمجياً
   const generateAddons = () => {
     const presets = [];
 
-    // --- أولاً: TMDB Collections (مع مفتاح API) ---
-    // نقوم بتشفير الإعدادات إذا لزم الأمر، أو نمررها كـ query parameter حسب وثائق الإضافة
-    // هنا سنفترض الصيغة القياسية: .../configure?api_key=... -> ثم نحولها لمانيفست
-    // أو نستخدم الرابط المباشر إذا كان المفتاح متوفراً
-    if (tmdbKey) {
-        // بناء رابط TMDB مع المفتاح (صيغة تقريبية شائعة)
-        // ملاحظة: بعض نسخ TMDB addon تحتاج base64 configuration
-        // سأستخدم هنا صيغة قياسية، وإذا لم تعمل، يفضل استخدام الرابط الجاهز
-        const tmdbConfig = btoa(JSON.stringify({ api_key: tmdbKey })); // تشفير الإعدادات
-        presets.push({ name: 'TMDB Collections (API)', url: `https://tmdb-addon.baby-beamup.club/${tmdbConfig}/manifest.json` });
-    } else {
-        presets.push({ name: 'TMDB Collections (No API)', url: 'https://tmdb-addon.baby-beamup.club/manifest.json' });
-    }
-
-    // --- ثانياً: StremThru Torz (بالرابط الجديد) ---
     if (rdKey) {
-        // استخدام النطاق الجديد الذي زودتني به + تمرير مفتاح Real-Debrid
         presets.push({ 
             name: 'StremThru Torz (RD)', 
             url: `https://stremthru.13377001.xyz/stremio/torz/realdebrid=${rdKey}/manifest.json` 
         });
     }
 
-    // --- ثالثاً: Torrentio ---
     if (torboxKey) presets.push({ name: 'Torrentio (Torbox)', url: `https://torrentio.strem.fun/torbox=${torboxKey}/manifest.json` });
     if (rdKey) presets.push({ name: 'Torrentio (Real-Debrid)', url: `https://torrentio.strem.fun/realdebrid=${rdKey}/manifest.json` });
 
-    // --- رابعاً: باقي القائمة ---
     presets.push({ name: 'MediaFusion', url: 'https://mediafusion.elfhosted.com/manifest.json' });
     presets.push({ name: 'TorrentsDB', url: 'https://stremio.torrents-db.com/manifest.json' });
     presets.push({ name: 'AutoStream', url: 'https://autostream.elfhosted.com/manifest.json' });
@@ -80,7 +58,6 @@ export default function NanoBananaPro() {
     setStep(3);
   };
 
-  // 3. المزامنة (تستخدم route.js الموجود مسبقاً)
   const startSync = async () => {
     setLoading(true);
     try {
@@ -95,7 +72,7 @@ export default function NanoBananaPro() {
       
       const data = await res.json();
       if (data.result?.success || !data.error) {
-        alert("تم! أضفت لك StremThru و TMDB وباقي الشلة.");
+        alert("تم! أضفت لك StremThru وباقي الشلة بدون TMDB.");
       } else {
         throw new Error(data.error);
       }
@@ -116,7 +93,7 @@ export default function NanoBananaPro() {
     <div className="min-h-screen bg-[#020617] text-slate-100 p-4 flex justify-center items-center" dir="rtl">
       <div className="w-full max-w-lg bg-[#0f172a] rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
         <div className="p-6 bg-blue-600/10 border-b border-slate-800 text-center font-black text-blue-500 text-2xl italic">
-          Nano Banana Pro 🍌 v35
+          ARBootStrapper - By Hussain
         </div>
 
         <div className="p-8">
@@ -144,7 +121,6 @@ export default function NanoBananaPro() {
                    <Key size={14} className="text-amber-400"/>
                    <label className="text-xs text-amber-400 font-bold">مفاتيح الخدمات الأخرى</label>
                 </div>
-                <input className="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs" placeholder="TMDB API Read Access Token" onChange={e => setTmdbKey(e.target.value)} />
                 <input className="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs" placeholder="SubDL API Key" onChange={e => setSubdlKey(e.target.value)} />
               </div>
 
