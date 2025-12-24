@@ -7,13 +7,16 @@ export default function NanoBananaPro() {
   const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [statusMsg, setStatusMsg] = useState('');
   
+  // المفاتيح
   const [rdKey, setRdKey] = useState('');
   const [torboxKey, setTorboxKey] = useState('');
   const [subdlKey, setSubdlKey] = useState('');
   
   const [addons, setAddons] = useState([]);
 
+  // 1. تسجيل الدخول
   const handleLogin = async () => {
     setLoading(true);
     try {
@@ -29,21 +32,33 @@ export default function NanoBananaPro() {
     setLoading(false);
   };
 
+  // 2. توليد الروابط (تم إضافة StremThru Torbox)
   const generateAddons = () => {
     const presets = [];
 
+    // --- StremThru (Real-Debrid) ---
     if (rdKey) {
         presets.push({ 
             name: 'StremThru Torz (RD)', 
-            url: `https://stremthru.13377001.xyz/stremio/torz/realdebrid=${rdKey}/manifest.json` 
+            url: `https://stremthru.13377001.xyz/stremio/torz/store=realdebrid&token=${rdKey}/manifest.json` 
         });
     }
 
+    // --- StremThru (TorBox) [الجديد] ---
+    if (torboxKey) {
+        presets.push({ 
+            name: 'StremThru Torz (TorBox)', 
+            url: `https://stremthru.13377001.xyz/stremio/torz/store=torbox&token=${torboxKey}/manifest.json` 
+        });
+    }
+
+    // --- Torrentio ---
     if (torboxKey) presets.push({ name: 'Torrentio (Torbox)', url: `https://torrentio.strem.fun/torbox=${torboxKey}/manifest.json` });
     if (rdKey) presets.push({ name: 'Torrentio (Real-Debrid)', url: `https://torrentio.strem.fun/realdebrid=${rdKey}/manifest.json` });
 
+    // --- باقي القائمة ---
     presets.push({ name: 'MediaFusion', url: 'https://mediafusion.elfhosted.com/manifest.json' });
-    presets.push({ name: 'TorrentsDB', url: 'https://stremio.torrents-db.com/manifest.json' });
+    presets.push({ name: 'TorrentsDB', url: 'https://torrents-db.elfhosted.com/manifest.json' }); 
     presets.push({ name: 'AutoStream', url: 'https://autostream.elfhosted.com/manifest.json' });
 
     if (subdlKey) {
@@ -58,8 +73,10 @@ export default function NanoBananaPro() {
     setStep(3);
   };
 
+  // 3. المزامنة
   const startSync = async () => {
     setLoading(true);
+    setStatusMsg('جاري الدمج والمزامنة...');
     try {
       const res = await fetch('/api/sync', {
         method: 'POST',
@@ -71,13 +88,22 @@ export default function NanoBananaPro() {
       });
       
       const data = await res.json();
-      if (data.result?.success || !data.error) {
-        alert("تم! أضفت لك StremThru وباقي الشلة بدون TMDB.");
+      
+      if (data.details) {
+         const failed = data.details.filter(d => !d.success).map(d => d.url).join('\n');
+         if (failed) {
+             alert("تمت المزامنة ولكن بعض الإضافات فشلت:\n" + failed);
+         } else {
+             alert("نجاح باهر! تم تثبيت StremThru لـ Torbox/RD وباقي القائمة.");
+         }
+      } else if (data.result?.success) {
+        alert("تمت العملية بنجاح!");
       } else {
-        throw new Error(data.error);
+        throw new Error(data.error || "خطأ غير معروف");
       }
     } catch (e) { alert("خطأ: " + e.message); }
     setLoading(false);
+    setStatusMsg('');
   };
 
   const move = (idx, dir) => {
@@ -93,13 +119,13 @@ export default function NanoBananaPro() {
     <div className="min-h-screen bg-[#020617] text-slate-100 p-4 flex justify-center items-center" dir="rtl">
       <div className="w-full max-w-lg bg-[#0f172a] rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
         <div className="p-6 bg-blue-600/10 border-b border-slate-800 text-center font-black text-blue-500 text-2xl italic">
-          ARBootStrapper - By Hussain
+          Nano Banana Pro 🍌 v38
         </div>
 
         <div className="p-8">
           {step === 1 && (
             <div className="space-y-4">
-              <input className="w-full p-4 rounded-xl bg-slate-900 border border-slate-800 outline-none" placeholder="الإيميل" onChange={e => setCredentials({...credentials, email: e.target.value})} />
+              <input className="w-full p-4 rounded-xl bg-slate-900 border border-slate-800 outline-none" placeholder="إيميل ستريميو" onChange={e => setCredentials({...credentials, email: e.target.value})} />
               <input className="w-full p-4 rounded-xl bg-slate-900 border border-slate-800 outline-none" type="password" placeholder="كلمة المرور" onChange={e => setCredentials({...credentials, password: e.target.value})} />
               <button onClick={handleLogin} disabled={loading} className="w-full bg-blue-600 p-4 rounded-xl font-bold">{loading ? "جاري الدخول..." : "دخول"}</button>
             </div>
@@ -110,10 +136,10 @@ export default function NanoBananaPro() {
               <div className="bg-slate-900/50 p-3 rounded-xl space-y-2 border border-slate-800">
                 <div className="flex items-center gap-2 mb-2">
                   <Key size={14} className="text-blue-400"/>
-                  <label className="text-xs text-blue-400 font-bold">مفاتيح Debrid (مهمة لـ StremThru)</label>
+                  <label className="text-xs text-blue-400 font-bold">مفاتيح Debrid</label>
                 </div>
-                <input className="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs" placeholder="Real-Debrid API" onChange={e => setRdKey(e.target.value)} />
-                <input className="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs" placeholder="Torbox API" onChange={e => setTorboxKey(e.target.value)} />
+                <input className="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs" placeholder="Real-Debrid API Key" onChange={e => setRdKey(e.target.value)} />
+                <input className="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs" placeholder="Torbox API Key" onChange={e => setTorboxKey(e.target.value)} />
               </div>
               
               <div className="bg-slate-900/50 p-3 rounded-xl space-y-2 border border-slate-800">
@@ -152,7 +178,7 @@ export default function NanoBananaPro() {
               </div>
 
               <button onClick={startSync} disabled={loading} className="w-full bg-blue-600 p-4 rounded-xl font-bold flex justify-center gap-2">
-                {loading ? <Loader2 className="animate-spin" size={20}/> : <Plus size={20}/>} {loading ? 'جاري التثبيت...' : 'إضافة لحسابي'}
+                {loading ? <Loader2 className="animate-spin" size={20}/> : <Plus size={20}/>} {loading ? (statusMsg || 'جاري التثبيت...') : 'إضافة لحسابي'}
               </button>
             </div>
           )}
